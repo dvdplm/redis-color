@@ -4,7 +4,7 @@
 
 extern crate libc;
 
-use libc::{c_int, c_long, c_longlong, size_t};
+use libc::{c_void, c_int, c_long, c_longlong, size_t};
 
 // Rust can't link against C macros (#define) so we just redefine them here.
 // There's a ~0 chance that any of these will ever change so it's pretty safe.
@@ -48,6 +48,33 @@ pub struct RedisModuleKey;
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct RedisModuleString;
+
+#[derive(Debug,Copy,Clone)] 
+#[repr(C)] 
+pub struct RedisModuleDigest;
+
+#[derive(Debug,Copy,Clone)] 
+#[repr(C)] 
+pub struct RedisModuleIO;
+
+pub type RedisModuleTypeLoadFunc = Option <unsafe extern "C" fn(rdb: *mut RedisModuleIO, encver: c_int) -> *mut c_void>;
+pub type RedisModuleTypeSaveFunc = Option <unsafe extern "C" fn(rdb: *mut RedisModuleIO, value: *mut c_void)>;
+pub type RedisModuleTypeRewriteFunc = Option <unsafe extern "C" fn(aof: *mut RedisModuleIO, key: *mut RedisModuleString, value: *mut c_void )>;
+pub type RedisModuleTypeMemUsageFunc = Option<unsafe extern "C" fn(value: *const c_void ) -> usize >;
+pub type RedisModuleTypeDigestFunc = Option<unsafe extern "C" fn(digest: *mut RedisModuleDigest , value: *mut c_void)>;
+pub type RedisModuleTypeFreeFunc = Option<unsafe extern "C" fn(value: *mut c_void )>;
+
+#[derive(Debug,Copy,Clone)]
+#[repr(C)]  
+pub struct RedisModuleTypeMethods { 
+    pub version: u64 , 
+    pub rdb_load: RedisModuleTypeLoadFunc,
+    pub rdb_save: RedisModuleTypeSaveFunc,
+    pub aof_rewrite: RedisModuleTypeRewriteFunc,
+    pub mem_usage: RedisModuleTypeMemUsageFunc,
+    pub digest: RedisModuleTypeDigestFunc,
+    pub free: RedisModuleTypeFreeFunc,
+}
 
 pub type RedisModuleCmdFunc = extern "C" fn(
     ctx: *mut RedisModuleCtx,
@@ -108,6 +135,17 @@ pub fn create_command(
             lastkey,
             keystep,
         )
+    }
+}
+
+pub fn create_type(
+    ctx: *mut RedisModuleCtx,
+    name: *const u8,
+    encver: c_int,
+    typemethods: *mut RedisModuleTypeMethods
+) -> Status {
+    unsafe {
+        RedisModule_CreateDataType(ctx, name, encver, typemethods)
     }
 }
 
@@ -207,6 +245,13 @@ extern "C" {
 
     static RedisModule_CloseKey: extern "C" fn(kp: *mut RedisModuleKey);
 
+    static RedisModule_CreateDataType: extern "C" fn(
+        ctx: *mut RedisModuleCtx, 
+        name: *const u8, 
+        encver: c_int, 
+        typemethods: *mut RedisModuleTypeMethods,
+    ) -> Status;
+        
     static RedisModule_CreateCommand:
         extern "C" fn(
         ctx: *mut RedisModuleCtx,
