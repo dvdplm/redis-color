@@ -27,6 +27,17 @@ pub enum ReplyType {
     Nil = 4,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum KeyType {
+    Empty = 0,  // REDISMODULE_KEYTYPE_EMPTY
+    String = 1, // REDISMODULE_KEYTYPE_STRING
+    List = 2,   // REDISMODULE_KEYTYPE_LIST
+    Hash = 3,   // REDISMODULE_KEYTYPE_HASH
+    Set = 4,    // REDISMODULE_KEYTYPE_SET
+    Zset = 5,   // REDISMODULE_KEYTYPE_ZSET
+    Module = 6, // REDISMODULE_KEYTYPE_MODULE
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Status {
     Ok = 0,
@@ -56,6 +67,10 @@ pub struct RedisModuleDigest;
 #[derive(Debug,Copy,Clone)] 
 #[repr(C)] 
 pub struct RedisModuleIO;
+
+#[derive(Debug,Copy,Clone)] 
+#[repr(C)] 
+pub struct RedisModuleType;
 
 pub type RedisModuleTypeLoadFunc = Option <unsafe extern "C" fn(rdb: *mut RedisModuleIO, encver: c_int) -> *mut c_void>;
 pub type RedisModuleTypeSaveFunc = Option <unsafe extern "C" fn(rdb: *mut RedisModuleIO, value: *mut c_void)>;
@@ -94,6 +109,17 @@ pub fn init(
 pub fn call_reply_type(reply: *mut RedisModuleCallReply) -> ReplyType {
     unsafe { RedisModule_CallReplyType(reply) }
 }
+
+pub fn key_type(key: *mut RedisModuleKey) -> KeyType {
+    unsafe { RedisModule_KeyType(key) }
+}
+
+pub fn module_type_set_value(key: *mut RedisModuleKey, value: *mut c_void) -> Status {
+    unsafe { RedisModule_ModuleTypeSetValue(key, super::COLOR_TYPE, value) }
+}
+// pub fn module_type_set_value(key: *mut RedisModuleKey, module_type: *mut RedisModuleType, value: *mut c_void) -> Status {
+//     unsafe { RedisModule_ModuleTypeSetValue(key, module_type, value) }
+// }
 
 pub fn free_call_reply(reply: *mut RedisModuleCallReply) {
     unsafe {
@@ -251,7 +277,21 @@ extern "C" {
         encver: c_int, 
         typemethods: *mut RedisModuleTypeMethods,
     ) -> Status;
-        
+
+    // TODO: Does kp has to be mut?
+    static RedisModule_KeyType: extern "C" fn(kp: *mut RedisModuleKey) -> KeyType;
+    static RedisModule_ModuleTypeSetValue: extern "C" fn(key: *mut RedisModuleKey, mt: *mut RedisModuleType, value: *mut c_void) -> Status;
+    // static RedisModule_ModuleTypeSetValue: extern "C" fn(key: *mut RedisModuleKey, mt: *mut RedisModuleType, value: *mut c_void) -> Status;
+// extern "C" { # [ link_name = "\u{1}_RedisModule_ModuleTypeSetValue" ] 
+// pub static mut RedisModule_ModuleTypeSetValue : :: std :: option :: Option < 
+//     unsafe extern "C" 
+//     fn ( key : * mut RedisModuleKey , mt : * mut RedisModuleType , value : * mut :: std :: os :: raw :: c_void ) -> :: std :: os :: raw :: c_int 
+//     > ; } 
+
+
+//     extern "C" { # [ link_name = "\u{1}_RedisModule_KeyType" ] 
+// pub static mut RedisModule_KeyType2 : Option<unsafe extern "C" fn(kp: *mut RedisModuleKey) -> c_int>;
+
     static RedisModule_CreateCommand:
         extern "C" fn(
         ctx: *mut RedisModuleCtx,
@@ -259,7 +299,7 @@ extern "C" {
         cmdfunc: Option<RedisModuleCmdFunc>,
         strflags: *const u8,
         firstkey: c_int,
-        lastkey: c_int,
+        lastkey: c_int, // Use -1 if there is a variable nr of keys; see: https://books.google.ee/books?id=VOtODwAAQBAJ&pg=PA322&lpg=PA322&dq=redis+command+keystep&source=bl&ots=_6HDlqT96n&sig=oa57cGy8dazL847LHP2ZLFsrZPw&hl=en&sa=X&ved=0ahUKEwjtjqSS4YDaAhUjD5oKHVeYDBoQ6AEIVDAE#v=onepage&q=redis%20command%20keystep&f=false
         keystep: c_int,
     ) -> Status;
 
@@ -275,7 +315,7 @@ extern "C" {
     static RedisModule_Log:
         extern "C" fn(ctx: *mut RedisModuleCtx, level: *const u8, fmt: *const u8);
 
-    static RedisModule_OpenKey:
+    pub static RedisModule_OpenKey:
         extern "C" fn(
         ctx: *mut RedisModuleCtx,
         keyname: *mut RedisModuleString,
