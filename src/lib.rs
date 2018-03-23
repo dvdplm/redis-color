@@ -45,30 +45,22 @@ impl Command for SetColorCommand {
         let key = r.open_key_writable(args[1]);
         if key.is_empty() {
             log_debug!(r, "Key {:?} is empty. Writing {:?}.", key, args[2]);
-            // key.write(args[2])?; // TODO: parse color and write bytes back
+            // TODO: parse color and write bytes back
             let c = Color::new();
             let out = key.write(&c)?;
             log_debug!(r, "Wrote value {:?} to key {:?}. Result: {:?}", c, key, out);
-            // map = new_multi_map();
-            // ffi::RedisModule_ModuleTypeSetValue.unwrap()(
-            //     key,
-            //     MULTI_MAP_TYPE,
-            //     map as *mut ::std::os::raw::c_void,
-            // );            
         } else {
             r.log_debug("Key is NOT empty. TODO: check type, bail if not our type, overwrite otherwise");
             let kt = key.key_type();
             log_debug!(r, "KEY TYPE: {:?}", kt);
+            // if key.key_type() != raw::KeyType::Module {
+            //     return Err(error!(raw::ERRORMSG_WRONGTYPE))
+            // }
+
+            if !key.valid_key_type() {
+                return Err(error!(raw::ERRORMSG_WRONGTYPE)) // TODO: better error msg
+            }
         }
-        // let key_name = raw::create_string(r.ctx, format!("{}\0",args[1]).as_ptr(), args[1].len()); // TODO: leaks!
-        // let key = raw::open_key(r.ctx, key_name, raw::KeyMode::READ | raw::KeyMode::WRITE);
-
-        // Check key type
-
-        // if invalid_key_type(key) {
-        //     return reply_with_error(ctx, ffi::ERRORMSG_WRONGTYPE);
-        // }
-        
         r.reply_integer(99)?;
         Ok(())
     }

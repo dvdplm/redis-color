@@ -287,6 +287,13 @@ pub struct RedisKeyWritable {
 }
 
 impl RedisKeyWritable {
+    pub fn log(&self, level: LogLevel, message: &str) {
+        raw::log(self.ctx, format!("{:?}\0", level).to_lowercase().as_ptr(), format!("{}\0", message).as_ptr());
+    }
+
+    pub fn log_debug(&self, message: &str) {
+        self.log(LogLevel::Notice, message)
+    }
     fn open(ctx: *mut raw::RedisModuleCtx, key: &str) -> RedisKeyWritable {
         let key_str = RedisString::create(ctx, key);
         let key_inner =
@@ -298,27 +305,7 @@ impl RedisKeyWritable {
         }
     }
 
-    /// Detects whether the value stored in a Redis key is empty.
-    ///
-    /// Note that an empty key can be reliably detected by looking for a null
-    /// as you open the key in read mode, but when asking for write Redis
-    /// returns a non-null pointer to allow us to write to even an empty key,
-    /// so we have to check the key's value instead.
-    // pub fn is_empty(&self) -> Result<bool, ColorError> {
-    //     match self.read()? {
-    //         Some(s) => match s.as_str() {
-    //             "" => Ok(true),
-    //             _ => Ok(false),
-    //         },
-    //         _ => Ok(false),
-    //     }
-    // }
     pub fn is_empty(&self) -> bool {
-    //         let key_type = ffi::RedisModule_KeyType.unwrap()(key);
-    // if key_type == (ffi::REDISMODULE_KEYTYPE_EMPTY as i32) {
-        // if self.key_type() == raw::KeyType::Empty {
-            
-        // }
         self.key_type() == raw::KeyType::Empty
     }
 
@@ -336,16 +323,6 @@ impl RedisKeyWritable {
         }
     }
 
-    // TODO: remove this
-    // pub fn write(&self, val: &str) -> Result<(), ColorError> {
-    //     let val_str = RedisString::create(self.ctx, val);
-    //     match raw::string_set(self.key_inner, val_str.str_inner) {
-    //         raw::Status::Ok => Ok(()),
-    //         raw::Status::Err => Err(error!("Error while setting key")),
-    //     }
-    // }
-
-    // TODO: rename to write
     pub fn write(&self, color: &super::Color) -> Result<(), ColorError> {
         let color_pt = Box::into_raw(Box::new(color));
         match raw::module_type_set_value(self.key_inner, color_pt as *mut c_void) {
@@ -357,6 +334,25 @@ impl RedisKeyWritable {
     pub fn key_type(&self) -> raw::KeyType {
         raw::key_type(self.key_inner)
     }
+
+    pub fn valid_key_type(&self) -> bool {
+        if self.key_type() != raw::KeyType::Module {
+            self.log_debug("Key type is not Module");
+            return false
+        }
+        if self.module_key_type() != unsafe{COLOR_TYPE} {
+            self.log_debug("Key type is Module but not COLOR_TYPE");
+            return false
+        }
+        self.log_debug("It's a COLOR! All good.");
+        true
+    }
+
+    fn module_key_type(&self) -> *mut raw::RedisModuleType {
+        raw::module_key_type(self.key_inner)
+    }
+
+
 }
 
 impl Drop for RedisKeyWritable {

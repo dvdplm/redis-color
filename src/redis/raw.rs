@@ -9,6 +9,7 @@ use libc::{c_void, c_int, c_long, c_longlong, size_t};
 // Rust can't link against C macros (#define) so we just redefine them here.
 // There's a ~0 chance that any of these will ever change so it's pretty safe.
 pub const REDISMODULE_APIVER_1: c_int = 1;
+pub const ERRORMSG_WRONGTYPE: &str = "WRONGTYPE Operation against a key holding the wrong kind of value";
 
 bitflags! {
     pub struct KeyMode: c_int {
@@ -117,9 +118,10 @@ pub fn key_type(key: *mut RedisModuleKey) -> KeyType {
 pub fn module_type_set_value(key: *mut RedisModuleKey, value: *mut c_void) -> Status {
     unsafe { RedisModule_ModuleTypeSetValue(key, super::COLOR_TYPE, value) }
 }
-// pub fn module_type_set_value(key: *mut RedisModuleKey, module_type: *mut RedisModuleType, value: *mut c_void) -> Status {
-//     unsafe { RedisModule_ModuleTypeSetValue(key, module_type, value) }
-// }
+
+pub fn module_key_type(key: *mut RedisModuleKey) -> *mut RedisModuleType {
+    unsafe { RedisModule_ModuleTypeGetType(key) }
+}
 
 pub fn free_call_reply(reply: *mut RedisModuleCallReply) {
     unsafe {
@@ -281,17 +283,8 @@ extern "C" {
     // TODO: Does kp has to be mut?
     static RedisModule_KeyType: extern "C" fn(kp: *mut RedisModuleKey) -> KeyType;
     static RedisModule_ModuleTypeSetValue: extern "C" fn(key: *mut RedisModuleKey, mt: *mut RedisModuleType, value: *mut c_void) -> Status;
-    // static RedisModule_ModuleTypeSetValue: extern "C" fn(key: *mut RedisModuleKey, mt: *mut RedisModuleType, value: *mut c_void) -> Status;
-// extern "C" { # [ link_name = "\u{1}_RedisModule_ModuleTypeSetValue" ] 
-// pub static mut RedisModule_ModuleTypeSetValue : :: std :: option :: Option < 
-//     unsafe extern "C" 
-//     fn ( key : * mut RedisModuleKey , mt : * mut RedisModuleType , value : * mut :: std :: os :: raw :: c_void ) -> :: std :: os :: raw :: c_int 
-//     > ; } 
-
-
-//     extern "C" { # [ link_name = "\u{1}_RedisModule_KeyType" ] 
-// pub static mut RedisModule_KeyType2 : Option<unsafe extern "C" fn(kp: *mut RedisModuleKey) -> c_int>;
-
+    static RedisModule_ModuleTypeGetType: extern "C" fn(key: *mut RedisModuleKey) -> *mut RedisModuleType;
+    
     static RedisModule_CreateCommand:
         extern "C" fn(
         ctx: *mut RedisModuleCtx,
