@@ -5,6 +5,7 @@ use std::error::Error;
 use std::iter;
 use std::ptr;
 use std::string;
+use std::ffi::{CString};
 use time;
 
 static mut COLOR_TYPE: *mut raw::RedisModuleType = 0 as *mut raw::RedisModuleType;
@@ -212,6 +213,14 @@ impl Redis {
         handle_status(
             raw::reply_with_string(self.ctx, redis_str.str_inner),
             "Could not reply with string",
+        )
+    }
+
+    pub fn reply_with_simple_string(&self, message: &str) -> Result<(), ColorError> {
+        let cstr = CString::new(message).unwrap();
+        handle_status(
+            raw::reply_with_simple_string(self.ctx, cstr.as_ptr()),
+            "Could not reply with simple string",
         )
     }
 }

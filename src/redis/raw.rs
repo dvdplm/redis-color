@@ -4,12 +4,13 @@
 
 extern crate libc;
 
-use libc::{c_void, c_int, c_long, c_longlong, size_t};
+use libc::{c_void, c_int, c_long, c_longlong, size_t, c_char};
 
 // Rust can't link against C macros (#define) so we just redefine them here.
 // There's a ~0 chance that any of these will ever change so it's pretty safe.
 pub const REDISMODULE_APIVER_1: c_int = 1;
 pub const ERRORMSG_WRONGTYPE: &str = "WRONGTYPE Operation against a key holding the wrong kind of value";
+pub const SIMPLE_OK: &str = "OK";
 
 bitflags! {
     pub struct KeyMode: c_int {
@@ -224,6 +225,10 @@ pub fn reply_with_string(
     unsafe { RedisModule_ReplyWithString(ctx, str) }
 }
 
+pub fn reply_with_simple_string(ctx: *mut RedisModuleCtx, str: *const c_char) -> Status {
+    unsafe { RedisModule_ReplyWithSimpleString(ctx, str) }
+}
+
 // Sets the expiry on a key.
 //
 // Expire is in milliseconds.
@@ -284,7 +289,7 @@ extern "C" {
     static RedisModule_KeyType: extern "C" fn(kp: *mut RedisModuleKey) -> KeyType;
     static RedisModule_ModuleTypeSetValue: extern "C" fn(key: *mut RedisModuleKey, mt: *mut RedisModuleType, value: *mut c_void) -> Status;
     static RedisModule_ModuleTypeGetType: extern "C" fn(key: *mut RedisModuleKey) -> *mut RedisModuleType;
-    
+
     static RedisModule_CreateCommand:
         extern "C" fn(
         ctx: *mut RedisModuleCtx,
@@ -326,6 +331,8 @@ extern "C" {
 
     static RedisModule_ReplyWithString:
         extern "C" fn(ctx: *mut RedisModuleCtx, str: *mut RedisModuleString) -> Status;
+    static RedisModule_ReplyWithSimpleString:
+        extern "C" fn(ctx: *mut RedisModuleCtx, str: *const c_char) -> Status;
 
     static RedisModule_SetExpire:
         extern "C" fn(key: *mut RedisModuleKey, expire: c_longlong) -> Status;

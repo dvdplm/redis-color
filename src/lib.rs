@@ -53,15 +53,11 @@ impl Command for SetColorCommand {
             r.log_debug("Key is NOT empty. TODO: check type, bail if not our type, overwrite otherwise");
             let kt = key.key_type();
             log_debug!(r, "KEY TYPE: {:?}", kt);
-            // if key.key_type() != raw::KeyType::Module {
-            //     return Err(error!(raw::ERRORMSG_WRONGTYPE))
-            // }
-
             if !key.valid_key_type() {
                 return Err(error!(raw::ERRORMSG_WRONGTYPE)) // TODO: better error msg
             }
         }
-        r.reply_integer(99)?;
+        r.reply_with_simple_string(raw::SIMPLE_OK)?;
         Ok(())
     }
     fn str_flags(&self) -> &'static str { "write" }
