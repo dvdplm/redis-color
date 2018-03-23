@@ -273,6 +273,7 @@ impl Drop for RedisKey {
 
 /// `RedisKeyWritable` is an abstraction over a Redis key that allows read and
 /// write operations.
+#[derive(Debug)]
 pub struct RedisKeyWritable {
     ctx:       *mut raw::RedisModuleCtx,
     key_inner: *mut raw::RedisModuleKey,
@@ -303,14 +304,22 @@ impl RedisKeyWritable {
     /// as you open the key in read mode, but when asking for write Redis
     /// returns a non-null pointer to allow us to write to even an empty key,
     /// so we have to check the key's value instead.
-    pub fn is_empty(&self) -> Result<bool, ColorError> {
-        match self.read()? {
-            Some(s) => match s.as_str() {
-                "" => Ok(true),
-                _ => Ok(false),
-            },
-            _ => Ok(false),
-        }
+    // pub fn is_empty(&self) -> Result<bool, ColorError> {
+    //     match self.read()? {
+    //         Some(s) => match s.as_str() {
+    //             "" => Ok(true),
+    //             _ => Ok(false),
+    //         },
+    //         _ => Ok(false),
+    //     }
+    // }
+    pub fn is_empty(&self) -> bool {
+    //         let key_type = ffi::RedisModule_KeyType.unwrap()(key);
+    // if key_type == (ffi::REDISMODULE_KEYTYPE_EMPTY as i32) {
+        // if self.key_type() == raw::KeyType::Empty {
+            
+        // }
+        self.key_type() == raw::KeyType::Empty
     }
 
     pub fn read(&self) -> Result<Option<String>, ColorError> {
@@ -337,10 +346,8 @@ impl RedisKeyWritable {
     // }
 
     // TODO: rename to write
-    pub fn write_module_value(&self, color: &super::Color) -> Result<(), ColorError> {
-        // Box::into_raw(Box::new(MultiMap::new()))
+    pub fn write(&self, color: &super::Color) -> Result<(), ColorError> {
         let color_pt = Box::into_raw(Box::new(color));
-        // let val_str = RedisString::create(self.ctx, value);
         match raw::module_type_set_value(self.key_inner, color_pt as *mut c_void) {
             raw::Status::Ok => Ok(()),
             raw::Status::Err => Err(error!("Error setting module type value")),
@@ -439,12 +446,20 @@ fn from_byte_string(byte_str: *const u8, length: size_t) -> Result<String, strin
 }
 
 fn read_key(key: *mut raw::RedisModuleKey) -> Result<String, string::FromUtf8Error> {
+
     let mut length: size_t = 0;
     from_byte_string(
         raw::string_dma(key, &mut length, raw::KeyMode::READ),
         length,
     )
 }
+// fn read_key(key: *mut raw::RedisModuleKey) -> Result<String, string::FromUtf8Error> {
+//     let mut length: size_t = 0;
+//     from_byte_string(
+//         raw::string_dma(key, &mut length, raw::KeyMode::READ),
+//         length,
+//     )
+// }
 
 fn to_raw_mode(mode: KeyMode) -> raw::KeyMode {
     match mode {

@@ -17,6 +17,7 @@ use redis::raw;
 const MODULE_NAME: &str = "redis-color";
 const MODULE_VERSION: c_int = 1;
 
+#[derive(Debug)]
 pub struct Color { r: u8, g: u8, b: u8, a: u8 }
 
 impl Color {
@@ -42,10 +43,12 @@ impl Command for SetColorCommand {
             return Err(error!("Usage: {} COLOR.SET pink #fe55fe", self.name() ));
         }
         let key = r.open_key_writable(args[1]);
-        if key.is_empty()? {
-            r.log_debug("Key is empty. Writing");
+        if key.is_empty() {
+            log_debug!(r, "Key {:?} is empty. Writing {:?}.", key, args[2]);
             // key.write(args[2])?; // TODO: parse color and write bytes back
-            key.write_module_value(&Color::new())?;
+            let c = Color::new();
+            let out = key.write(&c)?;
+            log_debug!(r, "Wrote value {:?} to key {:?}. Result: {:?}", c, key, out);
             // map = new_multi_map();
             // ffi::RedisModule_ModuleTypeSetValue.unwrap()(
             //     key,
