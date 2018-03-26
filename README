@@ -1,0 +1,1 @@
+This is a redis module that implements a custom data type: Color. It is a learning project and not useful in itself. The code here is a mishmash of the redis-cell and redis-multimap code bases. If you want to learn how to write redis modules you're probably better looking at those two projects than this one! :)
