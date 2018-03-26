@@ -124,6 +124,10 @@ pub fn module_key_type(key: *mut RedisModuleKey) -> *mut RedisModuleType {
     unsafe { RedisModule_ModuleTypeGetType(key) }
 }
 
+pub fn module_type_get_value(key: *mut RedisModuleKey) -> *mut c_void {
+    unsafe { RedisModule_ModuleTypeGetValue(key) }
+}
+
 pub fn free_call_reply(reply: *mut RedisModuleCallReply) {
     unsafe {
         RedisModule_FreeCallReply(reply);
@@ -289,6 +293,7 @@ extern "C" {
     static RedisModule_KeyType: extern "C" fn(kp: *mut RedisModuleKey) -> KeyType;
     static RedisModule_ModuleTypeSetValue: extern "C" fn(key: *mut RedisModuleKey, mt: *mut RedisModuleType, value: *mut c_void) -> Status;
     static RedisModule_ModuleTypeGetType: extern "C" fn(key: *mut RedisModuleKey) -> *mut RedisModuleType;
+    static RedisModule_ModuleTypeGetValue: extern "C" fn(key: *mut RedisModuleKey) -> *mut c_void;
 
     static RedisModule_CreateCommand:
         extern "C" fn(

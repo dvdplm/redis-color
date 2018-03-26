@@ -1,6 +1,6 @@
 pub mod raw;
 use error::ColorError;
-use libc::{c_void, c_int, c_long, c_longlong, size_t};
+use libc::{c_char, c_void, c_int, c_long, c_longlong, size_t};
 use std::error::Error;
 use std::iter;
 use std::ptr;
@@ -216,13 +216,14 @@ impl Redis {
         )
     }
 
-    pub fn reply_with_simple_string(&self, message: &str) -> Result<(), ColorError> {
+    pub fn reply_simple_string(&self, message: &str) -> Result<(), ColorError> {
         let cstr = CString::new(message).unwrap();
         handle_status(
             raw::reply_with_simple_string(self.ctx, cstr.as_ptr()),
             "Could not reply with simple string",
         )
     }
+
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -247,6 +248,14 @@ pub struct RedisKey {
 }
 
 impl RedisKey {
+    pub fn log(&self, level: LogLevel, message: &str) {
+        raw::log(self.ctx, format!("{:?}\0", level).to_lowercase().as_ptr(), format!("{}\0", message).as_ptr());
+    }
+
+    pub fn log_debug(&self, message: &str) {
+        self.log(LogLevel::Notice, message)
+    }
+    
     fn open(ctx: *mut raw::RedisModuleCtx, key: &str) -> RedisKey {
         let key_str = RedisString::create(ctx, key);
         let key_inner = raw::open_key(ctx, key_str.str_inner, to_raw_mode(KeyMode::Read));
@@ -263,13 +272,42 @@ impl RedisKey {
         self.key_inner == null_key
     }
 
-    pub fn read(&self) -> Result<Option<String>, ColorError> {
-        let val = if self.is_null() {
-            None
-        } else {
-            Some(read_key(self.key_inner)?)
-        };
-        Ok(val)
+    pub fn read(&self) -> Result<*mut super::Color, ColorError> {
+        if self.is_null() {
+            return Err(error!("null"))
+        }
+        let color = read_color_key(self.key_inner)?;
+        Ok(color)
+    }
+
+    // pub fn read_str(&self) -> Result<Option<String>, ColorError> {
+    //     let val = if self.is_null() {
+    //         None
+    //     } else {
+    //         Some(read_key(self.key_inner)?)
+    //     };
+    //     Ok(val)
+    // }
+
+    pub fn valid_key_type(&self) -> bool {
+        if self.key_type() != raw::KeyType::Module {
+            self.log_debug("Key type is not Module");
+            return false
+        }
+        if self.module_key_type() != unsafe{COLOR_TYPE} {
+            self.log_debug("Key type is Module but not COLOR_TYPE");
+            return false
+        }
+        self.log_debug("It's a COLOR! All good.");
+        true
+    }
+
+    fn key_type(&self) -> raw::KeyType {
+        raw::key_type(self.key_inner)
+    }
+
+    fn module_key_type(&self) -> *mut raw::RedisModuleType {
+        raw::module_key_type(self.key_inner)
     }
 }
 
@@ -318,19 +356,19 @@ impl RedisKeyWritable {
         self.key_type() == raw::KeyType::Empty
     }
 
-    pub fn read(&self) -> Result<Option<String>, ColorError> {
-        Ok(Some(read_key(self.key_inner)?))
-    }
+    // pub fn read(&self) -> Result<Option<String>, ColorError> {
+    //     Ok(Some(read_key(self.key_inner)?))
+    // }
 
-    pub fn set_expire(&self, expire: time::Duration) -> Result<(), ColorError> {
-        match raw::set_expire(self.key_inner, expire.num_milliseconds()) {
-            raw::Status::Ok => Ok(()),
+    // pub fn set_expire(&self, expire: time::Duration) -> Result<(), ColorError> {
+    //     match raw::set_expire(self.key_inner, expire.num_milliseconds()) {
+    //         raw::Status::Ok => Ok(()),
 
-            // Error may occur if the key wasn't open for writing or is an
-            // empty key.
-            raw::Status::Err => Err(error!("Error while setting key expire")),
-        }
-    }
+    //         // Error may occur if the key wasn't open for writing or is an
+    //         // empty key.
+    //         raw::Status::Err => Err(error!("Error while setting key expire")),
+    //     }
+    // }
 
     pub fn write(&self, color: &super::Color) -> Result<(), ColorError> {
         let color_pt = Box::into_raw(Box::new(color));
@@ -340,7 +378,7 @@ impl RedisKeyWritable {
         }
     }
 
-    pub fn key_type(&self) -> raw::KeyType {
+    fn key_type(&self) -> raw::KeyType {
         raw::key_type(self.key_inner)
     }
 
@@ -450,20 +488,20 @@ fn from_byte_string(byte_str: *const u8, length: size_t) -> Result<String, strin
   String::from_utf8(vec_str)
 }
 
-fn read_key(key: *mut raw::RedisModuleKey) -> Result<String, string::FromUtf8Error> {
-
-    let mut length: size_t = 0;
-    from_byte_string(
-        raw::string_dma(key, &mut length, raw::KeyMode::READ),
-        length,
-    )
-}
 // fn read_key(key: *mut raw::RedisModuleKey) -> Result<String, string::FromUtf8Error> {
+
 //     let mut length: size_t = 0;
 //     from_byte_string(
 //         raw::string_dma(key, &mut length, raw::KeyMode::READ),
 //         length,
 //     )
+// }
+
+// fn read_color_key(key: *mut raw::RedisModuleKey) -> Result<*mut super::Color, ColorError> {
+//     let color_pt = raw::module_type_get_value(key);
+//     // TODO: check null?
+//     Ok(color_pt as *mut super::Color)
+
 // }
 
 fn to_raw_mode(mode: KeyMode) -> raw::KeyMode {
